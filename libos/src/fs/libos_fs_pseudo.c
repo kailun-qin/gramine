@@ -12,6 +12,7 @@
 
 #include "libos_fs_pseudo.h"
 #include "libos_lock.h"
+#include "pal.h"
 #include "stat.h"
 
 LISTP_TYPE(pseudo_node) g_pseudo_roots = LISTP_INIT;
@@ -214,6 +215,8 @@ static int pseudo_istat(struct libos_dentry* dent, struct libos_inode* inode, st
     buf->st_gid  = inode->gid;
 
     struct pseudo_node* node = inode->data;
+    uint64_t time = 0;
+    int ret;
     switch (node->type) {
         case PSEUDO_DIR: {
             /*
@@ -240,6 +243,22 @@ static int pseudo_istat(struct libos_dentry* dent, struct libos_inode* inode, st
             buf->st_nlink = nlink;
             break;
         }
+        case PSEUDO_STR:
+            /* HACK: emulate other fields that may be required by some programs */
+            ret = PalSystemTimeQuery(&time);
+            if (ret < 0) {
+                log_error("%s: Failed to get time", __func__);
+            }
+            time_t t = time / 1000000;
+            buf->st_atime   = (time_t)t; /* access time */
+            buf->st_mtime   = (time_t)t; /* last modification */
+            buf->st_ctime   = (time_t)t; /* last status change */
+            buf->st_size    = 818;       /* hardcode for z */
+            buf->st_blocks  = 8;         /* number of 512B blocks allocated */
+            buf->st_blksize = 0x1000;
+            buf->st_mode   |= S_IWUSR;   /* hardcode for z */
+            buf->st_nlink   = 1;
+            break;
         case PSEUDO_DEV:
             buf->st_rdev = makedev(node->dev.major, node->dev.minor);
             buf->st_nlink = 1;

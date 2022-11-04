@@ -7,6 +7,7 @@
 #include "libos_flags_conv.h"
 #include "libos_fs.h"
 #include "libos_lock.h"
+#include "pal.h"
 #include "stat.h"
 
 int generic_seek(file_off_t pos, file_off_t size, file_off_t offset, int origin,
@@ -77,6 +78,19 @@ static int generic_istat(struct libos_inode* inode, struct stat* buf) {
      * account synthetic files created by Graphene, such as named pipes and sockets).
      */
     buf->st_nlink = (inode->type == S_IFDIR ? 2 : 1);
+
+    /* HACK: emulate other fields that may be required by some programs */
+    uint64_t time = 0;
+    int ret = PalSystemTimeQuery(&time);
+    if (ret < 0) {
+        log_error("%s: Failed to get time", __func__);
+    }
+    time_t t = time / 1000000;
+
+    buf->st_atime  = (time_t)t; /* access time */
+    buf->st_mtime  = (time_t)t; /* last modification */
+    buf->st_ctime  = (time_t)t; /* last status change */
+    buf->st_blocks = 8;         /* number of 512B blocks allocated */
 
     if (inode->mount->uri)
         buf->st_dev = hash_str(inode->mount->uri);
