@@ -73,6 +73,7 @@ libos_sources = files(
     'sys/libos_access.c',
     'sys/libos_alarm.c',
     'sys/libos_brk.c',
+    'sys/libos_cap.c',
     'sys/libos_clone.c',
     'sys/libos_dup.c',
     'sys/libos_epoll.c',

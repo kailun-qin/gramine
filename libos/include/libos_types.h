@@ -13,6 +13,7 @@
 #include <asm/stat.h>
 #include <asm/statfs.h>
 #include <linux/aio_abi.h>
+#include <linux/capability.h>
 #include <linux/eventpoll.h>
 #include <linux/futex.h>
 #include <linux/kernel.h>

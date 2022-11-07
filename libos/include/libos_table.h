@@ -127,6 +127,8 @@ long libos_syscall_getpgrp(void);
 long libos_syscall_setsid(void);
 long libos_syscall_getpgid(pid_t pid);
 long libos_syscall_getsid(pid_t pid);
+long libos_syscall_capget(cap_user_header_t hdrp, cap_user_data_t datap);
+long libos_syscall_capset(cap_user_header_t hdrp, const cap_user_data_t datap);
 long libos_syscall_rt_sigpending(__sigset_t* set, size_t sigsetsize);
 long libos_syscall_rt_sigtimedwait(const __sigset_t* unblocked_ptr, siginfo_t* info,
                                    struct __kernel_timespec* timeout, size_t setsize);
