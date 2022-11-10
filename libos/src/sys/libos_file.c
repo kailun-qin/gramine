@@ -575,3 +575,22 @@ long libos_syscall_chroot(const char* filename) {
 out:
     return ret;
 }
+
+
+long libos_syscall_setxattr(const char *path, const char *name, const void *value, size_t size,
+                            int flags) {
+    __UNUSED(path);
+    __UNUSED(name);
+    __UNUSED(value);
+
+    if (flags & ~(XATTR_CREATE|XATTR_REPLACE)) {
+        return -EINVAL;
+    }
+
+    if (size > XATTR_SIZE_MAX) {
+        return -E2BIG;
+    }
+
+    /* currently just a no-op */
+    return 0;
+}

@@ -971,3 +971,6 @@ int chroot_dentry_uri(struct libos_dentry* dent, mode_t type, char** out_uri);
 
 int chroot_readdir(struct libos_dentry* dent, readdir_callback_t callback, void* arg);
 int chroot_unlink(struct libos_dentry* dent);
+
+#define XATTR_CREATE  0x1 /* set value, fail if attr already exists */
+#define XATTR_REPLACE 0x2 /* set value, fail if attr does not exist */

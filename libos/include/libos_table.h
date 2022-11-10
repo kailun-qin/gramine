@@ -153,6 +153,8 @@ long libos_syscall_chroot(const char* filename);
 long libos_syscall_sethostname(char* name, int len);
 long libos_syscall_setdomainname(char* name, int len);
 long libos_syscall_gettid(void);
+long libos_syscall_setxattr(const char *path, const char *name, const void *value, size_t size,
+                            int flags);
 long libos_syscall_tkill(int pid, int sig);
 long libos_syscall_time(time_t* tloc);
 long libos_syscall_futex(int* uaddr, int op, int val, void* utime, int* uaddr2, int val3);
