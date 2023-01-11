@@ -210,6 +210,7 @@ long libos_syscall_getcpu(unsigned* cpu, unsigned* node, struct getcpu_cache* un
 long libos_syscall_getrandom(char* buf, size_t count, unsigned int flags);
 long libos_syscall_mlock2(unsigned long start, size_t len, int flags);
 long libos_syscall_sysinfo(struct sysinfo* info);
+long libos_syscall_getrusage(int who, struct __kernel_rusage* usage);
 
 #define GRND_NONBLOCK 0x0001
 #define GRND_RANDOM   0x0002

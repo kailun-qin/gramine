@@ -2,7 +2,7 @@
 /* Copyright (C) 2014 Stony Brook University */
 
 /*
- * Implementation of system calls "getrlimit", "setrlimit" and "sysinfo".
+ * Implementation of system calls "getrlimit", "setrlimit", "sysinfo" and "getrusage".
  */
 
 #include <asm/resource.h>
@@ -31,6 +31,9 @@
 #define MAX_MAX_FDS     65536
 #define MLOCK_LIMIT     (64 * 1024)
 #define MQ_BYTES_MAX    819200
+#define RUSAGE_SELF     0
+#define RUSAGE_CHILDREN (-1)
+#define RUSAGE_THREAD   1 /* only the calling thread */
 
 static struct __kernel_rlimit64 __rlim[RLIM_NLIMITS] __attribute_migratable = {
     [RLIMIT_CPU]     = {RLIM_INFINITY, RLIM_INFINITY},
@@ -172,5 +175,15 @@ long libos_syscall_sysinfo(struct sysinfo* info) {
     info->freehigh  = PalMemoryAvailableQuota();
     info->mem_unit  = 1;
     info->procs     = 1; /* report only this Gramine process */
+    return 0;
+}
+
+long libos_syscall_getrusage(int who, struct __kernel_rusage* usage) {
+    if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN && who != RUSAGE_THREAD)
+        return -EINVAL;
+    if (!is_user_memory_writable(usage, sizeof(*usage)))
+        return -EFAULT;
+
+    /* currently just a no-op */
     return 0;
 }
