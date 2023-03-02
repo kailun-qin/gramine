@@ -40,6 +40,9 @@ struct libos_process {
     /* This field should be accessed atomically, so no lock needed. */
     IDTYPE pgid;
 
+    /* This field should be accessed atomically, so no lock needed. */
+    IDTYPE sid;
+
     /* Currently all threads share filesystem information. For more info check `CLONE_FS` flag in
      * `clone.c`. Protected by `fs_lock`. */
     struct libos_dentry* root;

@@ -476,7 +476,7 @@ int proc_thread_stat_load(struct libos_dentry* dent, char** out_data, size_t* ou
         /* pgrp */
         { " %d", __atomic_load_n(&g_process.pgid, __ATOMIC_ACQUIRE) },
         /* session */
-        { " %d", /*dummy value=*/0 },
+        { " %d", __atomic_load_n(&g_process.sid, __ATOMIC_ACQUIRE) },
         /* tty_nr */
         { " %d", /*dummy value=*/0 },
         /* tpgid */

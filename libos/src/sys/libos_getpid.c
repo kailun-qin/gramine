@@ -61,12 +61,29 @@ long libos_syscall_getpgrp(void) {
 }
 
 long libos_syscall_setsid(void) {
-    /* TODO: currently we do not support session management. */
-    return -ENOSYS;
+    IDTYPE current_pid = g_process.pid;
+    IDTYPE current_ppid = g_process.ppid;
+    IDTYPE current_pgid = __atomic_load_n(&g_process.pgid, __ATOMIC_ACQUIRE);
+
+    /* If the caller is already a group leader or part of a process group whose leader is the
+     * caller's parent process, a new session cannot be created. */
+    if (current_pid == current_pgid || current_pgid == current_ppid) {
+        return -EPERM;
+    }
+
+    /* The calling process is the leader of the new session and the process group leader of the new
+     * process group. */
+    __atomic_store_n(&g_process.sid, current_pid, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_process.pgid, current_pid, __ATOMIC_RELEASE);
+
+    return __atomic_load_n(&g_process.sid, __ATOMIC_ACQUIRE);
 }
 
 long libos_syscall_getsid(pid_t pid) {
-    /* TODO: currently we do not support session management. */
-    __UNUSED(pid);
-    return -ENOSYS;
+    if (!pid || g_process.pid == (IDTYPE)pid) {
+        return __atomic_load_n(&g_process.sid, __ATOMIC_ACQUIRE);
+    }
+
+    /* TODO: Currently we do not support getting sid of other processes. */
+    return -EINVAL;
 }
