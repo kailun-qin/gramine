@@ -15,6 +15,8 @@
 
 #define CMDLINE_SIZE 4096
 
+extern struct libos_lock g_process_id_lock;
+
 DEFINE_LIST(libos_child_process);
 DEFINE_LISTP(libos_child_process);
 struct libos_child_process {
@@ -37,10 +39,10 @@ struct libos_process {
     IDTYPE pid;
     IDTYPE ppid;
 
-    /* This field should be accessed atomically, so no lock needed. */
+    /* Process Group ID. Protected by `g_process_id_lock`. */
     IDTYPE pgid;
 
-    /* This field should be accessed atomically, so no lock needed. */
+    /* Session ID. Protected by `g_process_id_lock`. */
     IDTYPE sid;
 
     /* Currently all threads share filesystem information. For more info check `CLONE_FS` flag in

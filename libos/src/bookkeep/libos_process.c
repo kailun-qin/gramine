@@ -16,8 +16,15 @@
 typedef bool (*child_cmp_t)(const struct libos_child_process*, unsigned long);
 
 struct libos_process g_process = { .pid = 0 };
+struct libos_lock g_process_id_lock;
 
 int init_process(void) {
+    /* If init_* function fails, then the whole process should die, so we do not need to clean-up
+     * on errors. */
+    if (!create_lock(&g_process_id_lock)) {
+        return -ENOMEM;
+    }
+
     if (g_process.pid) {
         /* `g_process` is already initialized, e.g. via checkpointing code. */
         return 0;

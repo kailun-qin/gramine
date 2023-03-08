@@ -37,7 +37,10 @@ long libos_syscall_setpgid(pid_t pid, pid_t pgid) {
     }
 
     if (!pid || g_process.pid == (IDTYPE)pid) {
-        __atomic_store_n(&g_process.pgid, (IDTYPE)pgid ?: g_process.pid, __ATOMIC_RELEASE);
+        lock(&g_process_id_lock);
+        g_process.pgid = (IDTYPE)pgid ?: g_process.pid;
+        unlock(&g_process_id_lock);
+
         /* TODO: inform parent about pgid change. */
         return 0;
     }
@@ -48,7 +51,11 @@ long libos_syscall_setpgid(pid_t pid, pid_t pgid) {
 
 long libos_syscall_getpgid(pid_t pid) {
     if (!pid || g_process.pid == (IDTYPE)pid) {
-        return __atomic_load_n(&g_process.pgid, __ATOMIC_ACQUIRE);
+        lock(&g_process_id_lock);
+        long ret = g_process.pgid;
+        unlock(&g_process_id_lock);
+
+        return ret;
     }
 
     /* TODO: Currently we do not support getting pgid of other processes.
@@ -61,9 +68,11 @@ long libos_syscall_getpgrp(void) {
 }
 
 long libos_syscall_setsid(void) {
+    lock(&g_process_id_lock);
+
     IDTYPE current_pid = g_process.pid;
     IDTYPE current_ppid = g_process.ppid;
-    IDTYPE current_pgid = __atomic_load_n(&g_process.pgid, __ATOMIC_ACQUIRE);
+    IDTYPE current_pgid = g_process.pgid;
 
     /* If the caller is already a group leader or part of a process group whose leader is the
      * caller's parent process, a new session cannot be created. */
@@ -73,15 +82,21 @@ long libos_syscall_setsid(void) {
 
     /* The calling process is the leader of the new session and the process group leader of the new
      * process group. */
-    __atomic_store_n(&g_process.sid, current_pid, __ATOMIC_RELEASE);
-    __atomic_store_n(&g_process.pgid, current_pid, __ATOMIC_RELEASE);
+    g_process.sid = current_pid;
+    g_process.pgid = current_pid;
 
-    return __atomic_load_n(&g_process.sid, __ATOMIC_ACQUIRE);
+    unlock(&g_process_id_lock);
+
+    return current_pid;
 }
 
 long libos_syscall_getsid(pid_t pid) {
     if (!pid || g_process.pid == (IDTYPE)pid) {
-        return __atomic_load_n(&g_process.sid, __ATOMIC_ACQUIRE);
+        lock(&g_process_id_lock);
+        long ret = g_process.sid;
+        unlock(&g_process_id_lock);
+
+        return ret;
     }
 
     /* TODO: Currently we do not support getting sid of other processes. */
