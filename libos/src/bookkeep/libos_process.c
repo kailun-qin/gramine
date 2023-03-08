@@ -30,8 +30,6 @@ int init_process(void) {
         return 0;
     }
 
-    /* If init_* function fails, then the whole process should die, so we do not need to clean-up
-     * on errors. */
     if (!create_lock(&g_process.children_lock)) {
         return -ENOMEM;
     }

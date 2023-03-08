@@ -77,6 +77,7 @@ long libos_syscall_setsid(void) {
     /* If the caller is already a group leader or part of a process group whose leader is the
      * caller's parent process, a new session cannot be created. */
     if (current_pid == current_pgid || current_pgid == current_ppid) {
+        unlock(&g_process_id_lock);
         return -EPERM;
     }
 

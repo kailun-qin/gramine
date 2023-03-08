@@ -466,6 +466,7 @@ int proc_thread_stat_load(struct libos_dentry* dent, char** out_data, size_t* ou
     if (!str)
         return -ENOMEM;
 
+    /* This lock is needed for accessing `pgid` and `sid`. */
     lock(&g_process_id_lock);
     struct {
         const char* fmt;
