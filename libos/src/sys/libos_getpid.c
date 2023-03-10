@@ -101,5 +101,5 @@ long libos_syscall_getsid(pid_t pid) {
     }
 
     /* TODO: Currently we do not support getting sid of other processes. */
-    return -EINVAL;
+    return -ESRCH;
 }
