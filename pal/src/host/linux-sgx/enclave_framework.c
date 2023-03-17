@@ -120,7 +120,7 @@ void* sgx_copy_to_ustack(const void* ptr, size_t size) {
     }
     void* uptr = sgx_alloc_on_ustack(size);
     if (uptr) {
-        memcpy(uptr, ptr, size);
+        sgx_copy_from_enclave_verified(uptr, ptr, size);
     }
     return uptr;
 }
@@ -130,11 +130,11 @@ void sgx_reset_ustack(const void* old_ustack) {
     UPDATE_USTACK(old_ustack);
 }
 
-static void copy_u64s(void* dst, const void* untrusted_src, size_t count) {
-    assert((uintptr_t)untrusted_src % 8 == 0);
+static void copy_u64s(void* dst, const void* src, size_t count) {
+    assert((uintptr_t)src % 8 == 0);
     __asm__ volatile (
         "rep movsq\n"
-        : "+D"(dst), "+S"(untrusted_src), "+c"(count)
+        : "+D"(dst), "+S"(src), "+c"(count)
         :
         : "memory", "cc"
     );
@@ -201,12 +201,63 @@ bool sgx_copy_to_enclave(void* ptr, size_t maxsize, const void* uptr, size_t usi
     return true;
 }
 
-bool sgx_copy_from_enclave(void* urts_ptr, const void* enclave_ptr, size_t size) {
-    if (!sgx_is_valid_untrusted_ptr(urts_ptr, size, /*alignment=*/1)
-            || !sgx_is_completely_within_enclave(enclave_ptr, size)) {
+void sgx_copy_from_enclave_verified(void* uptr, const void* ptr, size_t size) {
+    assert(sgx_is_completely_within_enclave(ptr, size));
+    assert(sgx_is_valid_untrusted_ptr(uptr, size, /*alignment=*/1));
+
+    if (size == 0) {
+        return;
+    }
+
+    /*
+     * This should be simple `memcpy(uptr, ptr, size)`, but CVE-2022-21166 (INTEL-SA-00615).
+     * To mitigate this issue, all writes to untrusted memory from within the enclave must be done
+     * in 8-byte chunks aligned to 8-bytes boundary. Since x64 allocates memory in pages of
+     * (at least) 0x1000 in size, we can safely 8-align the pointer down and the size up.
+     */
+    size_t copy_len;
+    size_t prefix_misalignment = (uintptr_t)ptr & 7;
+    if (prefix_misalignment) {
+        /* Beginning of the copied range is misaligned. */
+        char prefix_val[8] = { 0 };
+        memcpy(prefix_val, (char*)ptr - prefix_misalignment, /*count=*/1);
+
+        copy_len = MIN(sizeof(prefix_val) - prefix_misalignment, size);
+        copy_u64s(uptr, prefix_val + prefix_misalignment, copy_len);
+        uptr = (char*)uptr + copy_len;
+        ptr = (const char*)ptr + copy_len;
+        size -= copy_len;
+
+        if (size == 0) {
+            return;
+        }
+    }
+    assert((uintptr_t)ptr % 8 == 0);
+
+    size_t suffix_misalignment = size & 7;
+    copy_len = size - suffix_misalignment;
+    assert(copy_len % 8 == 0);
+    copy_u64s(uptr, ptr, copy_len / 8);
+    uptr = (char*)uptr + copy_len;
+    ptr = (const char*)ptr + copy_len;
+    size -= copy_len;
+
+    assert(size == suffix_misalignment);
+    if (suffix_misalignment) {
+        /* End of the copied range is misaligned. */
+        char suffix_val[8] = { 0 };
+        memcpy(suffix_val, ptr, /*count=*/1);
+        copy_u64s(uptr, suffix_val, suffix_misalignment);
+    }
+}
+
+bool sgx_copy_from_enclave(void* uptr, const void* ptr, size_t size) {
+    if (!sgx_is_valid_untrusted_ptr(uptr, size, /*alignment=*/1)
+            || !sgx_is_completely_within_enclave(ptr, size)) {
         return false;
     }
-    memcpy(urts_ptr, enclave_ptr, size);
+
+    sgx_copy_from_enclave_verified(uptr, ptr, size);
     return true;
 }
 
