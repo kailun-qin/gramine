@@ -38,7 +38,18 @@ long libos_syscall_setpgid(pid_t pid, pid_t pgid) {
 
     if (!pid || g_process.pid == (IDTYPE)pid) {
         lock(&g_process_id_lock);
-        g_process.pgid = (IDTYPE)pgid ?: g_process.pid;
+
+        IDTYPE pgid_to_set = (IDTYPE)pgid ?: g_process.pid;
+
+        /* TODO: Currently we do not support checking the process group of the joining process
+         * (specified by `pid`) and the existing process group to be joined (specified by `pgid`)
+         * must have the same session ID. */
+
+        if (g_process.pgid != pgid_to_set) {
+            g_process.pgid = pgid_to_set;
+            g_process.attached_to_pg = true;
+        }
+
         unlock(&g_process_id_lock);
 
         /* TODO: inform parent about pgid change. */
@@ -71,12 +82,11 @@ long libos_syscall_setsid(void) {
     lock(&g_process_id_lock);
 
     IDTYPE current_pid = g_process.pid;
-    IDTYPE current_ppid = g_process.ppid;
     IDTYPE current_pgid = g_process.pgid;
 
-    /* If the caller is already a group leader or part of a process group whose leader is the
-     * caller's parent process, a new session cannot be created. */
-    if (current_pid == current_pgid || current_pgid == current_ppid) {
+    /* If the caller is already a group leader or attached to a process group, a new session cannot
+     * be created. */
+    if (current_pid == current_pgid || g_process.attached_to_pg) {
         unlock(&g_process_id_lock);
         return -EPERM;
     }
@@ -85,6 +95,7 @@ long libos_syscall_setsid(void) {
      * process group. */
     g_process.sid = current_pid;
     g_process.pgid = current_pid;
+    g_process.attached_to_pg = true;
 
     unlock(&g_process_id_lock);
 

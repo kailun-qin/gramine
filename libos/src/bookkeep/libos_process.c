@@ -39,6 +39,7 @@ int init_process(void) {
 
     /* `pid` and `pgid` are initialized together with the first thread. */
     g_process.ppid = 0;
+    g_process.attached_to_pg = false;
 
     g_process.sid = 0;
 
@@ -242,6 +243,7 @@ BEGIN_CP_FUNC(process_description) {
     new_process->pid = process->pid;
     new_process->ppid = process->ppid;
     new_process->pgid = process->pgid;
+    new_process->attached_to_pg = false;
     new_process->sid = process->sid;
 
     /* copy cmdline (used by /proc/[pid]/cmdline) from the current process */

@@ -168,6 +168,7 @@ static long do_clone_new_vm(IDTYPE child_vmid, unsigned long flags, struct libos
         .pid = thread->tid,
         .ppid = g_process.pid,
         .pgid = g_process.pgid,
+        .attached_to_pg = false,
         .sid = g_process.sid,
         .root = g_process.root,
         .cwd = g_process.cwd,
