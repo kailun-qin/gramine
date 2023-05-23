@@ -357,7 +357,17 @@ int get_topology_info(struct pal_topo_info* topo_info) {
         }
     }
 
+    /* this helper variable is required to correctly read the `distance` file */
+    size_t online_nodes_cnt = 0;
     for (size_t i = 0; i < nodes_cnt; i++) {
+        if (numa_nodes[i].is_online)
+            online_nodes_cnt++;
+    }
+
+    for (size_t i = 0; i < nodes_cnt; i++) {
+        if (!numa_nodes[i].is_online)
+            continue;
+
         snprintf(path, sizeof(path), "/sys/devices/system/node/node%zu/cpulist", i);
         ret = iterate_ranges_from_file(path, set_node_id, &(struct set_node_id_args){
             .threads = threads,
@@ -370,7 +380,7 @@ int get_topology_info(struct pal_topo_info* topo_info) {
         ret = snprintf(path, sizeof(path), "/sys/devices/system/node/node%zu/distance", i);
         if (ret < 0)
             goto fail;
-        ret = read_numbers_from_file(path, distances + i * nodes_cnt, nodes_cnt);
+        ret = read_numbers_from_file(path, distances + i * nodes_cnt, online_nodes_cnt);
         if (ret < 0)
             goto fail;
 
