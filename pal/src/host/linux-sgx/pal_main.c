@@ -146,6 +146,15 @@ static int sanitize_topo_info(struct pal_topo_info* topo_info) {
         return -PAL_ERROR_INVAL;
     }
 
+    /* this helper variable is required to correctly check on `distance` values */
+    size_t online_nodes_cnt = 0;
+    for (size_t i = 0; i < topo_info->numa_nodes_cnt; i++) {
+        struct pal_numa_node_info* node = &topo_info->numa_nodes[i];
+        coerce_untrusted_bool(&node->is_online);
+        if (node->is_online)
+            online_nodes_cnt++;
+    }
+
     for (size_t i = 0; i < topo_info->threads_cnt; i++) {
         struct pal_cpu_thread_info* thread = &topo_info->threads[i];
         coerce_untrusted_bool(&thread->is_online);
@@ -201,9 +210,13 @@ static int sanitize_topo_info(struct pal_topo_info* topo_info) {
     }
 
     for (size_t i = 0; i < topo_info->numa_nodes_cnt; i++) {
+        struct pal_numa_node_info* node = &topo_info->numa_nodes[i];
+        coerce_untrusted_bool(&node->is_online);
+        if (!node->is_online)
+            continue;
         /* Note: Linux doesn't guarantee that distance i -> i is 0, so we aren't checking this (it's
          * actually non-zero on all machines we have). */
-        for (size_t j = 0; j < topo_info->numa_nodes_cnt; j++) {
+        for (size_t j = 0; j < online_nodes_cnt; j++) {
             if (   topo_info->numa_distance_matrix[i*topo_info->numa_nodes_cnt + j]
                 != topo_info->numa_distance_matrix[j*topo_info->numa_nodes_cnt + i])
                 return -PAL_ERROR_INVAL;
