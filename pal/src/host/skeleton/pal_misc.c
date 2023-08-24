@@ -63,3 +63,11 @@ double _PalGetBogomips(void) {
     /* this has to be implemented */
     return 0.0;
 }
+
+int _PalGetCommittedPages(uintptr_t addr, size_t size, uint8_t* bitvector, size_t* bitvector_size) {
+    __UNUSED(addr);
+    __UNUSED(size);
+    __UNUSED(bitvector);
+    __UNUSED(bitvector_size);
+    return -PAL_ERROR_NOTIMPLEMENTED;
+}

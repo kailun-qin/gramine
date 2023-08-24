@@ -17,6 +17,7 @@
 #include "pal_internal.h"
 #include "pal_linux.h"
 #include "pal_linux_error.h"
+#include "pal_sgx.h"
 #include "seqlock.h"
 #include "sgx_attest.h"
 #include "spinlock.h"
@@ -809,5 +810,31 @@ int _PalSegmentBaseSet(enum pal_segment_reg reg, uintptr_t addr) {
             return -PAL_ERROR_DENIED;
         default:
             return -PAL_ERROR_INVAL;
+    }
+}
+
+/* Get the committed pages of a given memory area; return a populated bitvector slice if EDMM is
+ * enabled for the SGX PAL and all-ones if it's not. */
+int _PalGetCommittedPages(uintptr_t addr, size_t size, uint8_t* bitvector, size_t* bitvector_size) {
+    assert(bitvector);
+    assert(bitvector_size);
+
+    if (g_pal_linuxsgx_state.edmm_enabled) {
+        return get_bitvector_slice(addr, size, bitvector, bitvector_size);
+    } else {
+        size_t num_pages = ALIGN_UP(size, g_page_size) / g_page_size;
+        size_t num_bytes = ALIGN_UP(num_pages, 8) / 8;
+        if (num_bytes > *bitvector_size) {
+            return -PAL_ERROR_NOMEM;
+        }
+        *bitvector_size = num_bytes;
+
+        memset(bitvector, 0xFF, num_bytes);
+
+        size_t leftover_pages = num_pages % 8;
+        if (leftover_pages)
+            bitvector[num_bytes - 1] = (1 << leftover_pages) - 1;
+
+        return 0;
     }
 }
