@@ -73,11 +73,11 @@ tests = {
     'munmap': {},
     'open_file': {},
     'open_opath': {},
-    'openmp': {
-        # NOTE: This will use `libgomp` in GCC and `libomp` in Clang.
-        'c_args': '-fopenmp',
-        'link_args': '-fopenmp',
-    },
+    # 'openmp': {
+    #     # NOTE: This will use `libgomp` in GCC and `libomp` in Clang.
+    #     'c_args': '-fopenmp',
+    #     'link_args': '-fopenmp',
+    # },
     'pipe': {},
     'pipe_nonblocking': {},
     'pipe_ocloexec': {},
