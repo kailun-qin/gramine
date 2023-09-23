@@ -15,6 +15,7 @@
 #include "pal.h"
 #include "pal_internal.h"
 #include "pal_linux.h"
+#include "sgx_arch.h"
 
 #define ADDR_IN_PAL(addr) ((void*)(addr) > TEXT_START && (void*)(addr) < TEXT_END)
 
@@ -232,6 +233,20 @@ static bool handle_ud(sgx_cpu_context_t* uc) {
     return false;
 }
 
+static bool is_sgx_eaccept(sgx_cpu_context_t* context) {
+    const uint8_t enclu_opcode[] = { 0x0f, 0x01, 0xd7, };
+
+    uint8_t* rip = (uint8_t*)context->rip;
+    for (size_t i = 0; i < ARRAY_SIZE(enclu_opcode); i++)
+        if (rip[i] != enclu_opcode[i])
+            return false;
+
+    if (context->rax != EACCEPT)
+        return false;
+
+    return true;
+}
+
 /* perform exception handling inside the enclave */
 void _PalExceptionHandler(unsigned int exit_info, sgx_cpu_context_t* uc,
                           PAL_XREGS_STATE* xregs_state, sgx_arch_exinfo_t* exinfo) {
@@ -281,8 +296,13 @@ void _PalExceptionHandler(unsigned int exit_info, sgx_cpu_context_t* uc,
         }
     }
 
-    /* in PAL, and event isn't asynchronous (i.e., synchronous exception) */
-    if (ADDR_IN_PAL(uc->rip) && event_num != PAL_EVENT_QUIT && event_num != PAL_EVENT_INTERRUPTED) {
+    bool async_event = (event_num == PAL_EVENT_QUIT || event_num == PAL_EVENT_INTERRUPTED);
+    bool memfault_with_edmm = (event_num == PAL_EVENT_MEMFAULT &&
+                               g_pal_linuxsgx_state.edmm_enabled);
+
+    /* in PAL, and event isn't asynchronous (i.e., synchronous exception) or memory fault with EDMM
+     * enabled (which will be handled later) */
+    if (ADDR_IN_PAL(uc->rip) && !async_event && !memfault_with_edmm) {
         char buf[LOCATION_BUF_SIZE];
         pal_describe_location(uc->rip, buf, sizeof(buf));
 
@@ -335,11 +355,33 @@ void _PalExceptionHandler(unsigned int exit_info, sgx_cpu_context_t* uc,
             break;
     }
 
+    if (memfault_with_edmm) {
+        if (ADDR_IN_PAL(uc->rip)) {
+            if (is_sgx_eaccept(uc)) {
+                /* We hit a memfault when running ENCLU[EACCEPT] on an enclave page inside PAL. This
+                 * happened because SGX driver's page fault handler somehow failed on dynamically
+                 * adding the page (see below for details). We simply retry in such case.
+                 *
+                 * - https://elixir.bootlin.com/linux/v6.5/source/arch/x86/kernel/cpu/sgx/encl.c#L314 */
+                goto out;
+            } else {
+                char buf[LOCATION_BUF_SIZE];
+                pal_describe_location(uc->rip, buf, sizeof(buf));
+
+                log_error("Unexpected memory fault occurred inside PAL (%s)", buf);
+                _PalProcessExit(1);
+            }
+        }
+
+        /* propagate the unhandled memfaults to LibOS via upcall */
+    }
+
     pal_event_handler_t upcall = _PalGetExceptionHandler(event_num);
     if (upcall) {
         (*upcall)(ADDR_IN_PAL(uc->rip), addr, &ctx);
     }
 
+out:
     restore_pal_context(uc, &ctx);
 }
 
