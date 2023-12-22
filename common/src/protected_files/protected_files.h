@@ -304,3 +304,11 @@ pf_status_t pf_get_handle(pf_context_t* pf, pf_handle_t* handle);
  * \returns PF status.
  */
 pf_status_t pf_flush(pf_context_t* pf);
+
+/*!
+ * \brief Initialize the free list of file nodes for a PF.
+ *
+ * \returns PF status.
+ */
+
+pf_status_t init_file_node_free_list(void);

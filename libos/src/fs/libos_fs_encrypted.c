@@ -272,11 +272,13 @@ int init_encrypted_files(void) {
     if (!create_lock(&g_keys_lock))
         return -ENOMEM;
 
+    int ret = init_file_node_free_list();
+    if (ret < 0)
+        return ret;
+
     pf_set_callbacks(&cb_read, &cb_write, &cb_truncate,
                      &cb_aes_cmac, &cb_aes_gcm_encrypt, &cb_aes_gcm_decrypt,
                      &cb_random, cb_debug_ptr);
-
-    int ret;
 
     /* Parse `fs.insecure__keys.*` */
 

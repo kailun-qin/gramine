@@ -219,6 +219,10 @@ static void cb_debug(const char* msg) {
 
 /* Initialize protected files for native environment */
 int pf_init(void) {
+    int ret = init_file_node_free_list();
+    if (ret < 0)
+        return ret;
+
     return pf_set_linux_callbacks(cb_debug);
 }
 

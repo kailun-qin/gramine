@@ -16,10 +16,10 @@
 
 #ifdef IN_LIBOS
 /* Forward declare, so this header stays standalone. */
-static inline unsigned int get_cur_tid(void);
+// static inline unsigned int get_cur_tid(void);
 
 #ifdef DEBUG_SPINLOCKS
-#define DEBUG_SPINLOCKS_LIBOS
+// #define DEBUG_SPINLOCKS_LIBOS
 #endif // DEBUG_SPINLOCKS
 
 #endif // IN_LIBOS
