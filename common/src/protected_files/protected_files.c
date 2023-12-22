@@ -534,12 +534,13 @@ static struct file_node_free_list_item* allocate_file_node(void) {
 
     spinlock_unlock(&g_file_node_free_list_lock);
 
+    memset(&item->file_node, 0, sizeof(item->file_node));
+
     return item;
 }
 
 static void _free_file_node(struct file_node_free_list_item* item) {
     assert(item->allocated);
-    memset(&item->file_node, 0, sizeof(item->file_node));
     item->allocated = false;
     item->next = file_node_free_list;
     file_node_free_list = item;
