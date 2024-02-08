@@ -34,14 +34,13 @@
 #include "common.h"
 
 #define EXPECTED_NUM_SIGSEGVS 1
-#define NUM_ITERATIONS 10
+#define NUM_ITERATIONS 100
 #define NUM_THREADS 5
 #define PAGE_SIZE (1ul << 12)
 #define TEST_FILE "testfile_map_noreserve"
 #define TEST_LENGTH  0xC0000000
 #define TEST_LENGTH2  0xC000000
 #define TEST_LENGTH3     0xA000
-#define TEST_STRESS_RACE_NUM_ITERATIONS 100
 
 static sigjmp_buf g_point;
 static int g_urandom_fd;
@@ -62,13 +61,10 @@ static unsigned long get_random_ulong(void) {
 }
 
 /* To stress races between several threads on the same lazily-allocated page, we repeatedly touch
- * different pages at random (with not too many pages, so that it has a reasonable chance of
- * collision).
- * TODO: Instead of mapping and unmapping before and after each test to move the pages back
- * to the to-be-lazy-alloc state, we can mix the above with `madvise(MADV_DONTNEED)` called from
- * time to time (if we implement it as uncommitting pages in the future -- now it's emulated as
- * zeroing pages) to achieve the same purpose. */
+ * different pages at random and mix with `madvise(MADV_DONTNEED)` called from time to time (with
+ * not too many pages, so that it has a reasonable chance of collision). */
 static void* thread_func(void* arg) {
+    int ret;
     char data;
     size_t num_pages = TEST_LENGTH3 / PAGE_SIZE;
 
@@ -76,6 +72,10 @@ static void* thread_func(void* arg) {
         size_t page = get_random_ulong() % num_pages;
         data = READ_ONCE(((char*)arg)[page * PAGE_SIZE]);
         if (data != 0)
+            return (void*)1;
+
+        ret = madvise(arg + page * PAGE_SIZE, PAGE_SIZE, MADV_DONTNEED);
+        if (ret)
             return (void*)1;
     }
     return (void*)0;
@@ -122,28 +122,26 @@ int main(void) {
     CHECK(munmap(a, TEST_LENGTH));
 
     /* test threads racing to access the same page in anonymous mappings with `MAP_NORESERVE` */
-    for (int i = 0; i < TEST_STRESS_RACE_NUM_ITERATIONS; i++) {
-        a = mmap(NULL, TEST_LENGTH3, PROT_READ | PROT_WRITE,
-                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0);
-        if (a == MAP_FAILED)
-            err(1, "mmap 2");
+    a = mmap(NULL, TEST_LENGTH3, PROT_READ | PROT_WRITE,
+             MAP_ANONYMOUS | MAP_PRIVATE | MAP_NORESERVE, -1, 0);
+    if (a == MAP_FAILED)
+        err(1, "mmap 2");
 
-        pthread_t threads[NUM_THREADS];
-        for (int i = 0; i < NUM_THREADS; i++) {
-            if (pthread_create(&threads[i], NULL, thread_func, a))
-                errx(1, "pthread_create failed");
-        }
-
-        for (int i = 0; i < NUM_THREADS; i++) {
-            void* ret;
-            if (pthread_join(threads[i], &ret))
-                errx(1, "pthread_join failed");
-            if (ret)
-                errx(1, "threads returned error");
-        }
-
-        CHECK(munmap(a, TEST_LENGTH3));
+    pthread_t threads[NUM_THREADS];
+    for (int i = 0; i < NUM_THREADS; i++) {
+        if (pthread_create(&threads[i], NULL, thread_func, a))
+            errx(1, "pthread_create failed");
     }
+
+    for (int i = 0; i < NUM_THREADS; i++) {
+        void* ret;
+        if (pthread_join(threads[i], &ret))
+            errx(1, "pthread_join failed");
+        if (ret)
+            errx(1, "threads returned error");
+    }
+
+    CHECK(munmap(a, TEST_LENGTH3));
 
     /* test anonymous mappings with `MAP_NORESERVE` accessed via file read/write
      *

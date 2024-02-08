@@ -1353,8 +1353,9 @@ static bool madvise_dontneed_visitor(struct libos_vma* vma, void* visitor_arg) {
             uint8_t byte = (ctx->bitvector)[byte_idx];
             for (size_t bit_idx = 0; bit_idx < 8; bit_idx++) {
                 if (byte & (1 << bit_idx)) {
-                    memset((void*)(zero_start + (byte_idx * 8 + bit_idx) * PAGE_SIZE), 0,
-                           PAGE_SIZE);
+                    if (PalVirtualMemoryFree(
+                        (void*)(zero_start + (byte_idx * 8 + bit_idx) * PAGE_SIZE), PAGE_SIZE) < 0)
+                        return false;
                 }
             }
         }
