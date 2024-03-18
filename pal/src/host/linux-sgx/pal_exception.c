@@ -338,7 +338,6 @@ void _PalExceptionHandler(unsigned int exit_info, sgx_cpu_context_t* uc,
     if (memfault_with_edmm) {
         /* EDMM lazy allocation */
         assert(g_mem_bkeep_get_vma_info_upcall);
-        assert(g_enclave_page_tracker);
 
         pal_prot_flags_t prot_flags;
 
@@ -361,8 +360,7 @@ void _PalExceptionHandler(unsigned int exit_info, sgx_cpu_context_t* uc,
              * This avoids a potential security issue where a malicious host could trick us into
              * committing the page twice (which would effectively allow the host to replace a
              * lazily-allocated page with 0s) by removing the page and forcing a page fault. */
-            int ret = _PalVirtualMemoryAlloc((void*)ALLOC_ALIGN_DOWN_PTR(addr), g_page_size,
-                                             prot_flags);
+            int ret = commit_lazy_alloc_pages(ALLOC_ALIGN_DOWN_PTR(addr), /*count=*/1, prot_flags);
             if (ret < 0) {
                 log_error("failed to lazily allocate page at 0x%lx: %s", addr, pal_strerror(ret));
                 _PalProcessExit(1);
