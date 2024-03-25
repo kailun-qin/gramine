@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <sys/random.h>
 #include <sys/wait.h>
 #include <ucontext.h>
 #include <unistd.h>
@@ -41,7 +42,6 @@
 #define TEST_LENGTH3     0xA000
 #define TEST_RACE_NUM_ITERATIONS 100
 
-static int g_urandom_fd;
 static size_t g_page_size;
 
 static bool g_write_failed;
@@ -92,9 +92,9 @@ static void memfault_handler(int signum, siginfo_t* info, void* context) {
 
 static unsigned long get_random_ulong(void) {
     unsigned long random_num;
-    ssize_t x = CHECK(read(g_urandom_fd, &random_num, sizeof(random_num)));
+    ssize_t x = getrandom(&random_num, sizeof(random_num), /*flags=*/0);
     if (x != sizeof(random_num))
-        errx(1, "/dev/urandom read: %zd", x);
+        err(1, "getrandom");
 
     return random_num;
 }
@@ -123,7 +123,6 @@ static void* thread_func(void* arg) {
 
 int main(void) {
     setbuf(stdout, NULL);
-    g_urandom_fd = CHECK(open("/dev/urandom", O_RDONLY));
     g_page_size = getpagesize();
 
     struct sigaction action = {
@@ -241,7 +240,6 @@ int main(void) {
 
     CHECK(munmap(a, TEST_LENGTH2));
 
-    CHECK(close(g_urandom_fd));
     puts("TEST OK");
     return 0;
 }
