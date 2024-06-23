@@ -546,6 +546,9 @@ static int initialize_enclave(struct pal_enclave* enclave, const char* manifest_
                 gs->heap_min = (void*)enclave_heap_min;
                 gs->heap_max = (void*)pal_area->addr;
                 gs->thread = NULL;
+
+                /* below field is used by AEX Notify */
+                gs->ready_for_aex_notify = 0;
             }
         } else if (areas[i].data_src == TCS) {
             for (size_t t = 0; t < enclave->thread_num; t++) {
@@ -561,6 +564,8 @@ static int initialize_enclave(struct pal_enclave* enclave, const char* manifest_
                 tcs->ofs_limit = 0xfff;
                 tcs->ogs_limit = 0xfff;
                 tcs_addrs[t] = (void*)tcs_area->addr + g_page_size * t;
+                if (enclave_token.body.attributes.flags & SGX_FLAGS_AEXNOTIFY)
+                    tcs->flags |= TCS_FLAGS_AEXNOTIFY;
             }
         } else if (areas[i].data_src == BUF) {
             memcpy(data, areas[i].buf, areas[i].buf_size);
@@ -775,6 +780,22 @@ static int parse_loader_config(char* manifest, struct pal_enclave* enclave_info,
         goto out;
     }
 
+    bool aex_notify_enabled;
+    ret = toml_bool_in(manifest_root, "sgx.experimental_enable_aex_notify", /*defaultval=*/false,
+                       &aex_notify_enabled);
+    if (ret < 0) {
+        log_error("Cannot parse 'sgx.experimental_enable_aex_notify' (the value must be `true` or "
+                  "`false`)");
+        ret = -EINVAL;
+        goto out;
+    }
+
+    if (aex_notify_enabled && !is_aexnotify_supported()) {
+        log_error("AEX Notify was requested in manifest, but CPU doesn't support it");
+        ret = -EPERM;
+        goto out;
+    }
+
     ret = toml_string_in(manifest_root, "sgx.profile.enable", &profile_str);
     if (ret < 0) {
         log_error("Cannot parse 'sgx.profile.enable' "
@@ -783,7 +804,8 @@ static int parse_loader_config(char* manifest, struct pal_enclave* enclave_info,
         goto out;
     }
 
-    ret = toml_bool_in(manifest_root, "sgx.vtune_profile", /*defaultval=*/false, &g_vtune_profile_enabled);
+    ret = toml_bool_in(manifest_root, "sgx.vtune_profile", /*defaultval=*/false,
+                       &g_vtune_profile_enabled);
     if (ret < 0) {
         log_error("Cannot parse 'sgx.vtune_profile' (the value must be `true` or `false`)");
         ret = -EINVAL;

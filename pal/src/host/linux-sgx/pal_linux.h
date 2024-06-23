@@ -35,6 +35,7 @@ extern struct pal_linuxsgx_state {
     bool enclave_initialized;        /* thread creation ECALL is allowed only after this is set */
     bool edmm_enabled;
     bool memfaults_without_exinfo_allowed;
+    bool aex_notify_enabled;
     sgx_report_body_t enclave_info;  /* cached self-report result, trusted */
 
     /* remaining heap usable by application */
@@ -94,6 +95,9 @@ void init_xsave_size(uint64_t xfrm);
 void save_xregs(PAL_XREGS_STATE* xsave_area);
 void restore_xregs(const PAL_XREGS_STATE* xsave_area);
 noreturn void _restore_sgx_context(sgx_cpu_context_t* uc, PAL_XREGS_STATE* xsave_area);
+
+void init_aex_notify_for_thread(void);
+void fini_aex_notify_for_thread(void);
 
 void _PalExceptionHandler(uint32_t trusted_exit_info_,
                           uint32_t untrusted_external_event, sgx_cpu_context_t* uc,
