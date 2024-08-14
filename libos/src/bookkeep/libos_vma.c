@@ -1419,6 +1419,13 @@ static bool madvise_dontneed_visitor(struct libos_vma* vma, void* visitor_arg) {
         return true;
     }
 
+/* There is a data race in the SGX driver where two enclave threads may try to add and remove the
+ * same enclave page simultaneously (e.g., if both lazy allocation and `MADV_DONTNEED` semantics are
+ * supported), see below for details:
+ * https://lore.kernel.org/lkml/20240429104330.3636113-3-dmitrii.kuvaiskii@intel.com.
+ *
+ * TODO: remove this once the Linux kernel is patched. */
+#ifdef LINUX_KERNEL_PATCHED
     uintptr_t start = MAX(ctx->begin, vma->begin);
     uintptr_t end = MIN(ctx->end, vma->end);
     int ret = PalFreeThenLazyReallocCommittedPages((void*)start, end - start);
@@ -1426,6 +1433,34 @@ static bool madvise_dontneed_visitor(struct libos_vma* vma, void* visitor_arg) {
         ctx->error = pal_to_unix_errno(ret);
         return false;
     }
+#else
+    uintptr_t zero_start = MAX(ctx->begin, vma->begin);
+    uintptr_t zero_end = MIN(ctx->end, vma->valid_end);
+
+    pal_prot_flags_t pal_prot = LINUX_PROT_TO_PAL(vma->prot, vma->flags);
+    pal_prot_flags_t pal_prot_writable = pal_prot | PAL_PROT_WRITE;
+
+    if (pal_prot != pal_prot_writable) {
+        /* make the area writable so that it can be memset-to-zero */
+        int ret = PalVirtualMemoryProtect((void*)zero_start, zero_end - zero_start,
+                                          pal_prot_writable);
+        if (ret < 0) {
+            ctx->error = pal_to_unix_errno(ret);
+            return false;
+        }
+    }
+
+    memset((void*)zero_start, 0, zero_end - zero_start);
+
+    if (pal_prot != pal_prot_writable) {
+        /* the area was made writable above; restore the original permissions */
+        int ret = PalVirtualMemoryProtect((void*)zero_start, zero_end - zero_start, pal_prot);
+        if (ret < 0) {
+            log_error("restoring original permissions failed: %s", pal_strerror(ret));
+            BUG();
+        }
+    }
+#endif
 
     return true;
 }
