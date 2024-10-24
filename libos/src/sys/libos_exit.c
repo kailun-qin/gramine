@@ -15,6 +15,7 @@
 #include "libos_table.h"
 #include "libos_thread.h"
 #include "libos_utils.h"
+#include "libos_vma.h"
 #include "pal.h"
 
 static noreturn void libos_clean_and_exit(int exit_code) {
@@ -162,6 +163,8 @@ noreturn void process_exit(int error_code, int term_signal) {
     }
 
     (void)kill_other_threads();
+
+    log_always("VmPeak:\t%8lu kB", get_peak_memory_usage() / 1024);
 
     /* Now quit our thread. Since we are the last one, this will exit the whole LibOS. */
     thread_exit(error_code, term_signal);
