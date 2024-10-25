@@ -144,6 +144,7 @@ static void handle_sync_signal(int signum, siginfo_t* info, struct ucontext* uc)
 }
 
 static void handle_async_signal(int signum, siginfo_t* info, struct ucontext* uc) {
+    log_always("handle_async_signal");
     enum pal_event event = signal_to_pal_event(signum);
 
     __UNUSED(info);
@@ -229,10 +230,14 @@ int sgx_signal_setup(void) {
     if (ret < 0)
         goto err;
 
+    log_always("start sigterm register");
+    sleep(10);
     /* register asynchronous signals in host Linux */
     ret = set_signal_handler(SIGTERM, handle_async_signal);
     if (ret < 0)
         goto err;
+    log_always("sigterm registered, wait another 10");
+    sleep(10);
 
     ret = set_signal_handler(SIGCONT, handle_async_signal);
     if (ret < 0)
